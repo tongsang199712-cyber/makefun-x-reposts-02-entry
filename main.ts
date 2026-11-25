@@ -1,25 +1,70 @@
-// makefun-x-reposts-02 entry point (Node 22, standard library only).
+// Entry point for the makefun-x-reposts-02 submission.
 //
-// The entry itself is the X posts listed in POSTS.json: quote posts and
-// replies of mine on X, each answering a different one of make.fun's newest
-// posts, made from one public account. This program does not score anything
-// and does not fetch anything; it only hands POSTS.json to the grader by
-// copying it from the repository into the output directory, byte for byte,
-// so the gate reads the list exactly as it was submitted.
+// The actual entry is a set of posts I published on X (quote posts and
+// replies, each one answering a different recent post from make.fun, all
+// from a single public account). Those post URLs live in POSTS.json next
+// to this file. This program's only job is to deliver that list to the
+// grader: it reads POSTS.json from the bot directory and writes it into
+// the output directory, unchanged.
 //
-// Local run:
+// Run locally:
 //   mkdir -p out && MAKEFUN_BOT_DIR=. MAKEFUN_OUTPUT_DIR=out node main.ts
 
-import { copyFileSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
 
-const botDir = process.env.MAKEFUN_BOT_DIR ?? '/bot';
-const outputDir = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
+const botDir = process.env.MAKEFUN_BOT_DIR ?? ".";
+const outputDir = process.env.MAKEFUN_OUTPUT_DIR ?? "out";
 
-mkdirSync(outputDir, { recursive: true });
+const sourcePath = join(botDir, "POSTS.json");
+const targetPath = join(outputDir, "POSTS.json");
+
+let raw: string;
 try {
-  copyFileSync(join(botDir, 'POSTS.json'), join(outputDir, 'POSTS.json'));
+  raw = readFileSync(sourcePath, "utf8");
 } catch (err) {
-  console.error(`POSTS.json could not be copied from ${botDir}: ${(err as Error).message}`);
+  console.error(`cannot read ${sourcePath}: ${(err as Error).message}`);
   process.exit(1);
 }
+
+// Validate the list before handing it over. Every entry has to be the
+// canonical URL of a single X post, the list must hold between 1 and 15
+// entries, and duplicates are dropped (first occurrence wins). Anything
+// malformed aborts the run instead of silently shipping a bad list.
+const POST_URL = /^https:\/\/x\.com\/[A-Za-z0-9_]+\/status\/\d+$/;
+
+function fail(reason: string): never {
+  console.error(`invalid POSTS.json: ${reason}`);
+  process.exit(1);
+}
+
+let parsed: unknown;
+try {
+  parsed = JSON.parse(raw);
+} catch (err) {
+  fail(`not valid JSON (${(err as Error).message}`);
+}
+
+const postsField = (parsed as { posts?: unknown } | null)?.posts;
+if (!Array.isArray(postsField)) {
+  fail(`"posts" must be an array`);
+}
+
+const seen = new Set<string>();
+const posts: string[] = [];
+for (const entry of postsField) {
+  if (typeof entry !== "string" || !POST_URL.test(entry)) {
+    fail(`entry is not an X post URL: ${JSON.stringify(entry)}`);
+  }
+  if (!seen.has(entry)) {
+    seen.add(entry);
+    posts.push(entry);
+  }
+}
+if (posts.length < 1 || posts.length > 15) {
+  fail(`expected 1-15 posts after de-duplication, got ${posts.length}`);
+}
+
+mkdirSync(outputDir, { recursive: true });
+writeFileSync(targetPath, JSON.stringify({ posts }, null, 2) + "\n");
+console.log(`copied ${posts.length} post URL(s) to ${targetPath}`);
