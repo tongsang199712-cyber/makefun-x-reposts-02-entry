@@ -1,0 +1,1 @@
+make.fun 新赏金 makefun-x-reposts-02（$500，前 50 名分奖，截止 2026-11-28T07:30Z）：用用户 X 账号 @tongsang123x 引用转发/回复 @makefunai 的最新帖子（帖子池从 status 2125053632605196760 起），每条带 make.fun/@makefunai 和 play code makefun-pastry-ridge-gourd，收集帖子地址写入 POSTS.json，写 main.ts（Node 22 标准库，把 POSTS.json 拷到 /output），跑本地验证，按 skill.md 打包构建会话并提交。
